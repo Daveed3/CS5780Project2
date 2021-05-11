@@ -19,8 +19,8 @@ import java.util.Random;
 
 public class CLA {
 	String serverName = "localhost";
-	static int port_ctf = 8881;
-	static int port_voter= 8880;
+	static int port_ctf = 8883;
+	static int port_voter= 8882;
 	RSA rsa = new RSA();
 	String key_pair = rsa.e+","+rsa.N;
 	private ServerSocket voter_Serversocket;
@@ -125,7 +125,7 @@ public class CLA {
 	}
 	
 	public static void WriteFile( String content) {
-		String filename =   "ValidatioNos.txt";
+		String filename =   "./ValidatioNos.txt";
 		try {
 			File file = new File(filename);
 			// create new if file doesnt exist

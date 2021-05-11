@@ -19,8 +19,8 @@ import java.util.Map.Entry;
 //Checks voters' validation by checking voter's validation number vs the list provided by the CLA
 //CTF publishes the results of the election
 public class CTF {
-	static int port_voter = 8880;
-	static int port_ctf = 8881;
+	static int port_voter = 8881;
+	static int port_cla = 8883;
 	
 	HashSet<Candidate> candidatesList = new HashSet<Candidate>();
 	
@@ -63,33 +63,38 @@ public class CTF {
 	HashMap<String, String> Login = new HashMap<String, String>();
 	HashMap<String, Boolean> Login_vote = new HashMap<String, Boolean>();
 	
+	// Reads if the voter is connected and offers the voter all the choices the voter can vote for
 	private void vote_caste(String choice, Socket voter) {
 		String[] list = choice.split(",");
 		writeFile("Raw__Data.txt",choice);
 		BigInteger validationNo = new BigInteger(list[2]);
 		String username = list[1];
+		// Decrypts the user info
 		username = rsa.decrypt(username, voter_public_key, voter_N);
 		validationNo = rsa.decrypt(validationNo, voter_public_key, voter_N);
 
+		// Decrypts the candidates info
 		BigInteger Cand_id = new BigInteger(list[3]);
 		Cand_id = rsa.decrypt(Cand_id, voter_public_key, voter_N);
 
 		String res = "";
 		try {
 			ObjectOutputStream out = new ObjectOutputStream(voter.getOutputStream());
-			if (hasVoted.containsKey(username)) {
+			if (hasVoted.containsKey(username)) {		// Validate if the user already voted
 				res = "You have already voted !!";
-			} else if (ValidationNumber.containsKey(validationNo.toString())) {
+			} else if (ValidationNumber.containsKey(validationNo.toString())) { // Validate the user's number
 				res = "Invalid Validation Number";
 			} else {
 				Boolean flag = true;
+				
+				// List all the candidates
 				for (Candidate Cand : candidatesList) {
 					if (Cand.id == Cand_id.intValue()) {
-						System.out.println("updating vote for " + Cand.candidate_name);
+						System.out.println("Updating vote for " + Cand.candidate_name);
 						Cand.increaseVote();
 						flag = false;
 
-						res = "You have Successfully Voted for the :" + Cand.candidate_name;
+						res = "You have Successfully Voted for:" + Cand.candidate_name;
 						hasVoted.put(username, true);
 						Write_username_password();
 						update_candidate_list();
@@ -100,24 +105,25 @@ public class CTF {
 					res = "This choice of Candidate does not exist ";
 				}
 			}
-
 			out.writeObject(res);
 			out.flush();
-
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 	
+	// Uses the Candidate class to get list of candidates (used to keep track of candidate features)
 	private void getCandidateList() {
 		BufferedReader br = null;
-		String path = "../candidateList.txt";
+		String path = "./candidateList.txt";
+		String path2 = "../candidateList.txt";
+		
 		try {
-			FileInputStream f = new FileInputStream(path);
+			FileInputStream f = new FileInputStream(testPaths(path, path2));
 			String line;
-
 			br = new BufferedReader(new InputStreamReader(f));
 
+			// List all the candidates
 			while ((line = br.readLine()) != null) {
 				String[] line_array = line.split(",");
 				Candidate cand = new Candidate(line_array[1],line_array[0],line_array[2]);
@@ -146,12 +152,12 @@ public class CTF {
 			@SuppressWarnings("unchecked")
 			public void run() {
 				try {
-					CLA_ServerSocket = new ServerSocket(port_ctf);
-					System.out.println("Waiting for Central Legitimization Agency (CLA) at port no: " +port_ctf);
+					CLA_ServerSocket = new ServerSocket(port_cla);
+					System.out.println("Waiting for Central Legitimization Agency (CLA) at port no: " +port_cla);
 					Socket cla = null;
 					while (true && !stop) {
 					cla = CLA_ServerSocket.accept();
-					System.out.println("CLA is connected ....");
+					System.out.println("CLA is connected...");
 
 					try {
 						ObjectOutputStream out = new ObjectOutputStream(cla.getOutputStream());
@@ -186,66 +192,62 @@ public class CTF {
 					Voter_ServerSocket = new ServerSocket(port_voter);
 					System.out.println("Waiting for Voter at port no: " +port_voter );
 					while (true && !stop) {
+						// Voter connects
 						Socket voter = Voter_ServerSocket.accept();
-						System.out.println("Voter is connected ...");
+						System.out.println("Voter is connected...");
 						String choice;
-
 						ObjectInputStream input = new ObjectInputStream(voter.getInputStream());
-
 						choice = (String) input.readObject();
 
+						// Gets the voter's menu choice
 						switch (choice.substring(0, 1)) {
-						case "1":
-							System.out.println("Voter wants to validate himself");
-							try {
-								ObjectOutputStream out = new ObjectOutputStream(voter.getOutputStream());
-								out.writeObject(rsa_key);
-								out.flush();
-
-							} catch (IOException ex) {
-								System.err.println("Error: " + ex);
-
-							}
-							getKey(voter, "VOT");
-							System.out.println("sending the candidates");
-							try {
-								ObjectOutputStream out_list = new ObjectOutputStream(voter.getOutputStream());
-								System.out.println(Getcandidate);
-								out_list.writeObject(Getcandidate);
-							} catch (IOException e) {
-								e.printStackTrace();
-							}
-
-							String[] list = choice.split(",");
-
-							String username = rsa.decrypt(list[1], voter_public_key, voter_N);
-							String password = rsa.decrypt(list[2], voter_public_key, voter_N);
-
-							Boolean res = false;
-
-							try {
-								ObjectOutputStream out = new ObjectOutputStream(voter.getOutputStream());
-								for (Entry<String, String> log : Login.entrySet()) {
-									if (log.getKey().equals(username) && log.getValue().equals(password)) {
-										res = true;
-										break;
-									}
+							case "1":
+								System.out.println("Option 1 Selected: Voter wants to validate himself");
+								try {
+									ObjectOutputStream out = new ObjectOutputStream(voter.getOutputStream());
+									out.writeObject(rsa_key);
+									out.flush();
+								} catch (IOException ex) {
+									System.err.println("Error: " + ex);
+								}
+								getKey(voter, "VOT");
+								System.out.println("Sending the candidates");
+								try {
+									ObjectOutputStream out_list = new ObjectOutputStream(voter.getOutputStream());
+									System.out.println(Getcandidate);
+									out_list.writeObject(Getcandidate);
+								} catch (IOException e) {
+									e.printStackTrace();
 								}
 
-								out.writeObject(res);
-								out.flush();
-
-							} catch (IOException ex) {
-								ex.printStackTrace();
-							}
+								String[] list = choice.split(",");
+								
+								String username = rsa.decrypt(list[1], voter_public_key, voter_N);
+								String password = rsa.decrypt(list[2], voter_public_key, voter_N);
+								
+								Boolean res = false;
+								
+								try {
+									ObjectOutputStream out = new ObjectOutputStream(voter.getOutputStream());
+									for (Entry<String, String> log : Login.entrySet()) {
+										if (log.getKey().equals(username) && log.getValue().equals(password)) {
+											res = true;
+											break;
+										}
+									}	
+									out.writeObject(res);
+									out.flush();
+								} catch (IOException ex) {
+									ex.printStackTrace();
+								}
 							break;
 							case "2":
-								System.out.println("Voter wants  to vote");
+								System.out.println("Option 2 Selected: Voter wants to vote");
 								vote_caste(choice, voter);
 								break;
 								
 							case "3":
-								System.out.println("Voter wants  to see the result:");
+								System.out.println("Option 3 Selected: Voter wants to see the result:");
 								try {
 									ObjectOutputStream out = new ObjectOutputStream(voter.getOutputStream());
 
@@ -269,6 +271,7 @@ public class CTF {
 		}).start();
 	}
 	
+	// Helper method to create CTF_Login.txt
 	public void Write_username_password() {
 		try {
 			File file = new File("CTF_Login.txt");
@@ -300,11 +303,11 @@ public class CTF {
 
 	private void ReadUsernamePassword() {
 		BufferedReader br = null;
-		String path = "../CTF_Login.txt";
-		System.out.println("Testing");
+		String path = "./CTF_Login.txt";
+		String path2 = "../CTF_login.txt";
 		System.out.println(System.getProperty("user.dir"));
 		try {
-			FileInputStream f = new FileInputStream(path);
+			FileInputStream f = new FileInputStream(testPaths(path, path2));
 			String sCurrentLine;
 
 			br = new BufferedReader(new InputStreamReader(f));
@@ -356,6 +359,7 @@ public class CTF {
 		}
 	}
 	
+	// Helper method to close the CLA socket
 	public void CLASocket_close() {
 		try {
 			CLA_ServerSocket.close();
@@ -369,6 +373,22 @@ public class CTF {
 		ctf.ReadUsernamePassword();
 		ctf.getCandidateList();
 		ctf.startServer();
+	}
+	
+	// Helper method to test path if outside IDE
+	public static String testPaths(String path1, String path2) {
+		try {
+			FileInputStream f = new FileInputStream(path1);
+			return path1;
+		} catch (Exception e) {
+			try {
+				FileInputStream f = new FileInputStream(path2);
+				return path2;
+			} catch (Exception e2) {
+				e2.printStackTrace();
+			}
+		}
+		return "";
 	}
 	
 	// Create file for private and public keys
